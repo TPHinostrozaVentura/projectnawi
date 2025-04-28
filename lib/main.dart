@@ -1,125 +1,319 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'splash_screen.dart';
+import 'package:tflite_v2/tflite_v2.dart';
+import 'text_reader_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
+  runApp(MyApp(cameras: cameras));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
 
-  // This widget is the root of your application.
+class MyApp extends StatelessWidget {
+  final List<CameraDescription> cameras;
+  const MyApp({Key? key, required this.cameras});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      debugShowCheckedModeBanner: false,
+      home: SplashScreen(cameras: cameras),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class RealTimeObjectDetection extends StatefulWidget {
+  final List<CameraDescription> cameras;
+  final String model;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+  RealTimeObjectDetection({required this.cameras, required this.model});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _RealTimeObjectDetectionState createState() => _RealTimeObjectDetectionState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  List<String> lastUniqueObjects = [];
+  final int maxObjects = 10;
+
+  late CameraController _controller;
+  bool isModelLoaded = false;
+  List<dynamic>? recognitions;
+  int imageHeight = 0;
+  int imageWidth = 0;
+  bool isProcessing = false;
+  FlutterTts flutterTts = FlutterTts();
+  bool isSpeaking = false;
+  bool isFlashOn = false;
+
+  stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeCamera();
+    loadModel(widget.model);
+    configureTts();
+    initSpeechRecognizer(); // Initialize speech recognition
+  }
+
+  String getObjectsString() {
+    return lastUniqueObjects.join(', ');
+  }
+
+  void configureTts() async {
+    await flutterTts.setLanguage("es-ES");
+    await flutterTts.setPitch(1.0);
+    await flutterTts.setSpeechRate(0.5);
+  }
+
+  Future<void> loadModel(String modelName) async {
+    String? modelPath;
+    String? labelPath;
+
+    if (modelName == 'SSDMobileNet') {
+      modelPath = 'assets/detect.tflite';
+      labelPath = 'assets/labelmap.txt';
+    } else if (modelName == 'BilletesModel') {
+      modelPath = 'assets/model.tflite';
+      labelPath = 'assets/labels.txt';
+    }
+
+    try {
+      String? res = await Tflite.loadModel(
+        model: modelPath!,
+        labels: labelPath!,
+      );
+      setState(() {
+        isModelLoaded = res != null;
+      });
+    } catch (e) {
+      print("Error al cargar el modelo: $e");
+      setState(() {
+        isModelLoaded = false;
+      });
+    }
+  }
+
+  void initializeCamera() async {
+    _controller = CameraController(
+      widget.cameras[0],
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+
+    await _controller.initialize();
+
+    if (!mounted) return;
+
+    _controller.startImageStream((CameraImage image) {
+      if (isModelLoaded && !isProcessing) {
+        runModel(image);
+      }
     });
+    setState(() {});
+  }
+
+  void runModel(CameraImage image) async {
+    if (image.planes.isEmpty || isProcessing) return;
+
+    setState(() {
+      isProcessing = true;
+    });
+
+    var recognitions = await Tflite.detectObjectOnFrame(
+      bytesList: image.planes.map((plane) => plane.bytes).toList(),
+      model: widget.model == 'SSDMobileNet' ? 'SSDMobileNet' : 'model.tflite',
+      imageHeight: image.height,
+      imageWidth: image.width,
+      imageMean: 127.5,
+      imageStd: 127.5,
+      numResultsPerClass: 2,
+      threshold: 0.5,
+    );
+
+    setState(() {
+      this.recognitions = recognitions;
+      isProcessing = false;
+    });
+
+    if (recognitions != null && recognitions.isNotEmpty && !isSpeaking) {
+
+      String detectedClass = recognitions[0]["detectedClass"];
+      double confidence = recognitions[0]["confidenceInClass"];
+
+      if(!lastUniqueObjects.contains(detectedClass)){
+        if(lastUniqueObjects.length>=maxObjects){
+          lastUniqueObjects.remove(0);
+        }
+        lastUniqueObjects.add(detectedClass);
+      }
+
+      print('Últimos objetos detectados: ${lastUniqueObjects.join(", ")}');
+
+      describeObject(detectedClass, confidence);
+    }
+  }
+
+  void describeObject(String detectedClass, double confidence) async {
+    setState(() {
+      isSpeaking = true;
+    });
+
+    String description = 'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
+    await flutterTts.speak(description);
+
+    flutterTts.setCompletionHandler(() {
+      setState(() {
+        isSpeaking = false;
+      });
+    });
+  }
+
+  void toggleFlash() async {
+    if (_controller.value.isInitialized) {
+      try {
+        await _controller.setFlashMode(
+          isFlashOn ? FlashMode.off : FlashMode.torch,
+        );
+        setState(() {
+          isFlashOn = !isFlashOn;
+        });
+      } catch (e) {
+        print("Error al cambiar el modo de flash: $e");
+      }
+    }
+  }
+
+  // Initialize speech recognizer
+  void initSpeechRecognizer() async {
+    bool available = await _speech.initialize(onStatus: (val) {
+      if (val == 'done' && _isListening) {
+        startListening(); // Restart listening after it stops
+      }
+    }, onError: (val) => print('Speech recognizer error: $val'));
+
+    if (available) {
+      startListening();
+    }
+  }
+
+  // Start listening for voice commands
+  void startListening() {
+    _speech.listen(onResult: (val) {
+      if (val.recognizedWords.toLowerCase().contains("cambiar a lectura de texto")) {
+        _navigateToTextReading();
+      } else if (val.recognizedWords.toLowerCase().contains("cambiar a detección de objetos")) {
+        _navigateToObjectDetection();
+      }
+    });
+    setState(() {
+      _isListening = true;
+    });
+  }
+
+  void _navigateToTextReading() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => TextReaderScreen(cameras: widget.cameras)),
+    );
+  }
+
+  void _navigateToObjectDetection() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => RealTimeObjectDetection(cameras: widget.cameras, model: widget.model)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    if (!_controller.value.isInitialized) {
+      return Container();
+    }
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: CameraPreview(_controller),
+          ),
+          if (recognitions != null)
+            BoundingBoxes(
+              recognitions: recognitions!,
+              previewH: imageHeight.toDouble(),
+              previewW: imageWidth.toDouble(),
+              screenH: MediaQuery.of(context).size.height,
+              screenW: MediaQuery.of(context).size.width,
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+          Positioned(
+            top: 30,
+            right: 20,
+            child: IconButton(
+              icon: Icon(
+                isFlashOn ? Icons.flash_on : Icons.flash_off,
+                color: Colors.white,
+                size: 30,
+              ),
+              onPressed: toggleFlash,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+}
+
+class BoundingBoxes extends StatelessWidget {
+  final List<dynamic> recognitions;
+  final double previewH;
+  final double previewW;
+  final double screenH;
+  final double screenW;
+
+  BoundingBoxes({
+    required this.recognitions,
+    required this.previewH,
+    required this.previewW,
+    required this.screenH,
+    required this.screenW,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: recognitions.map((rec) {
+        var x = rec["rect"]["x"] * screenW;
+        var y = rec["rect"]["y"] * screenH;
+        double w = rec["rect"]["w"] * screenW;
+        double h = rec["rect"]["h"] * screenH;
+
+        return Positioned(
+          left: x,
+          top: y,
+          width: w,
+          height: h,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Colors.red,
+                width: 3,
+              ),
+            ),
+            child: Text(
+              "${rec["detectedClass"]} ${(rec["confidenceInClass"] * 100).toStringAsFixed(0)}%",
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 15,
+                background: Paint()..color = Colors.black,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
