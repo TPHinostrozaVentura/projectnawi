@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
+import 'package:projectnawi/banknote_recogni_screen.dart';
 import 'package:projectnawi/useGuide.dart';
 import 'main.dart';
 import 'text_reader_screen.dart';  // Importa la nueva pantalla
@@ -82,10 +83,7 @@ class SplashScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => RealTimeObjectDetection(
-                        cameras: cameras,
-                        model: 'BilletesModel',
-                      ),
+                      builder: (context) => CameraInferenceScreen(),
                     ),
                   );
                 },
