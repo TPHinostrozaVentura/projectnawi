@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:flutter/services.dart'; // Para vibración
+import 'package:flutter/services.dart';
 import 'splash_screen.dart';
 import 'package:tflite_v2/tflite_v2.dart';
 import 'text_reader_screen.dart';
@@ -33,7 +33,8 @@ class RealTimeObjectDetection extends StatefulWidget {
   RealTimeObjectDetection({required this.cameras, required this.model});
 
   @override
-  _RealTimeObjectDetectionState createState() => _RealTimeObjectDetectionState();
+  _RealTimeObjectDetectionState createState() =>
+      _RealTimeObjectDetectionState();
 }
 
 class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
@@ -53,6 +54,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
   stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool isListeningManually = false;
+  bool isVoiceCommandActive = false; // Silencia audiodescripciones
 
   @override
   void initState() {
@@ -126,7 +128,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
     var recognitions = await Tflite.detectObjectOnFrame(
       bytesList: image.planes.map((plane) => plane.bytes).toList(),
-      model: widget.model == 'SSDMobileNet' ? 'SSDMobileNet' : 'model.tflite',
+      model:
+      widget.model == 'SSDMobileNet' ? 'SSDMobileNet' : 'model.tflite',
       imageHeight: image.height,
       imageWidth: image.width,
       imageMean: 127.5,
@@ -140,7 +143,10 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
       isProcessing = false;
     });
 
-    if (recognitions != null && recognitions.isNotEmpty && !isSpeaking) {
+    if (recognitions != null &&
+        recognitions.isNotEmpty &&
+        !isSpeaking &&
+        !isVoiceCommandActive) {
       String detectedClass = recognitions[0]["detectedClass"];
       double confidence = recognitions[0]["confidenceInClass"];
 
@@ -156,11 +162,14 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
   }
 
   void describeObject(String detectedClass, double confidence) async {
+    if (isVoiceCommandActive) return;
+
     setState(() {
       isSpeaking = true;
     });
 
-    String description = 'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
+    String description =
+        'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
     await flutterTts.speak(description);
 
     flutterTts.setCompletionHandler(() {
@@ -192,15 +201,15 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
           setState(() => _isListening = false);
         }
       },
-      onError: (val) => print('Error en reconocimiento de voz: $val'),
+      onError: (val) => print('Error en voz: $val'),
     );
-
     if (!available) {
       print("Reconocimiento de voz no disponible");
     }
   }
 
   void startManualListening() async {
+    isVoiceCommandActive = true;
     setState(() {
       isListeningManually = true;
       _isListening = true;
@@ -211,15 +220,16 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
     _speech.listen(onResult: (val) {
       String command = val.recognizedWords.toLowerCase();
-      if (command.contains("cambiar a lectura de texto") || command.contains("modo lectura")) {
+      if (command.contains("modo lectura")) {
         _navigateToTextReading();
-      } else if (command.contains("cambiar a detección de objetos") || command.contains("modo normal")) {
+      } else if (command.contains("modo normal")) {
         _navigateToObjectDetection();
       }
     });
   }
 
   void stopManualListening() async {
+    isVoiceCommandActive = false;
     await flutterTts.speak("Comando recibido");
     HapticFeedback.selectionClick();
     await _speech.stop();
@@ -231,13 +241,20 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
   void _navigateToTextReading() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TextReaderScreen(cameras: widget.cameras)),
+      MaterialPageRoute(
+        builder: (_) => TextReaderScreen(cameras: widget.cameras),
+      ),
     );
   }
 
   void _navigateToObjectDetection() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => RealTimeObjectDetection(cameras: widget.cameras, model: widget.model)),
+      MaterialPageRoute(
+        builder: (_) => RealTimeObjectDetection(
+          cameras: widget.cameras,
+          model: widget.model,
+        ),
+      ),
     );
   }
 
@@ -284,14 +301,17 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
                 onTapDown: (_) => startManualListening(),
                 onTapUp: (_) => stopManualListening(),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 60, vertical: 20),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 60, vertical: 20),
                   decoration: BoxDecoration(
                     color: Colors.deepOrange,
                     borderRadius: BorderRadius.circular(40),
                   ),
                   child: Text(
-                    _isListening ? "Escuchando..." : "Mantén presionado para hablar",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+                    _isListening
+                        ? "Escuchando..."
+                        : "Mantén presionado para hablar",
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
                   ),
                 ),
               ),

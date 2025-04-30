@@ -3,7 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter/services.dart';
-import 'main.dart'; // para poder volver a RealTimeObjectDetection
+import 'main.dart'; // para volver al modo normal
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class TextReaderScreen extends StatefulWidget {
@@ -59,9 +59,13 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
     final inputImage = InputImage.fromFilePath(image.path);
     final recognizedText = await textRecognizer.processImage(inputImage);
 
-    for (TextBlock block in recognizedText.blocks) {
-      await flutterTts.speak(block.text);
-      break; // Solo lee el primer bloque
+    // ✅ Concatenar todo el texto detectado
+    String fullText = recognizedText.text.trim();
+
+    if (fullText.isNotEmpty) {
+      await flutterTts.speak(fullText);
+    } else {
+      await flutterTts.speak("No se detectó texto");
     }
 
     setState(() => isProcessing = false);
@@ -92,7 +96,7 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
 
     _speech.listen(onResult: (val) {
       String command = val.recognizedWords.toLowerCase();
-      if (command.contains("modo normal") || command.contains("cambiar a detección de objetos")) {
+      if (command.contains("modo normal") || command.contains("detección de objetos")) {
         _navigateToObjectDetection();
       }
     });
