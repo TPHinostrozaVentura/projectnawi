@@ -114,9 +114,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void _navigateToBilletes() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => RealTimeObjectDetection(
-          cameras: widget.cameras,
-          model: 'BilletesModel',
+        builder: (context) => CameraInferenceScreen(
         ),
       ),
     );
@@ -175,30 +173,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   onPressed: _navigateToBilletes,
                   child: const Text('Detección de Billetes', style: TextStyle(fontSize: 18)),
                 ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => CameraInferenceScreen(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Detección de Billetes',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 15),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
                 const SizedBox(height: 15),
                 ElevatedButton(
                   style: _style(Colors.blueAccent),
@@ -214,7 +188,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ],
             ),
           ),
-          // Botón Push to Talk
           Positioned(
             bottom: 30,
             left: 0,
