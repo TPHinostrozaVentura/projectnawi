@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter/services.dart';
 import 'splash_screen.dart';
 import 'package:tflite_v2/tflite_v2.dart';
 import 'text_reader_screen.dart';
@@ -11,7 +12,6 @@ void main() async {
   final cameras = await availableCameras();
   runApp(MyApp(cameras: cameras));
 }
-
 
 class MyApp extends StatelessWidget {
   final List<CameraDescription> cameras;
@@ -33,11 +33,11 @@ class RealTimeObjectDetection extends StatefulWidget {
   RealTimeObjectDetection({required this.cameras, required this.model});
 
   @override
-  _RealTimeObjectDetectionState createState() => _RealTimeObjectDetectionState();
+  _RealTimeObjectDetectionState createState() =>
+      _RealTimeObjectDetectionState();
 }
 
 class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
-
   List<String> lastUniqueObjects = [];
   final int maxObjects = 10;
 
@@ -53,6 +53,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
   stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
+  bool isListeningManually = false;
+  bool isVoiceCommandActive = false; // Silencia audiodescripciones
 
   @override
   void initState() {
@@ -60,11 +62,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     initializeCamera();
     loadModel(widget.model);
     configureTts();
-    initSpeechRecognizer(); // Initialize speech recognition
-  }
-
-  String getObjectsString() {
-    return lastUniqueObjects.join(', ');
+    initSpeechRecognizer();
   }
 
   void configureTts() async {
@@ -117,6 +115,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
         runModel(image);
       }
     });
+
     setState(() {});
   }
 
@@ -129,7 +128,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
     var recognitions = await Tflite.detectObjectOnFrame(
       bytesList: image.planes.map((plane) => plane.bytes).toList(),
-      model: widget.model == 'SSDMobileNet' ? 'SSDMobileNet' : 'model.tflite',
+      model:
+      widget.model == 'SSDMobileNet' ? 'SSDMobileNet' : 'model.tflite',
       imageHeight: image.height,
       imageWidth: image.width,
       imageMean: 127.5,
@@ -143,30 +143,33 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
       isProcessing = false;
     });
 
-    if (recognitions != null && recognitions.isNotEmpty && !isSpeaking) {
-
+    if (recognitions != null &&
+        recognitions.isNotEmpty &&
+        !isSpeaking &&
+        !isVoiceCommandActive) {
       String detectedClass = recognitions[0]["detectedClass"];
       double confidence = recognitions[0]["confidenceInClass"];
 
-      if(!lastUniqueObjects.contains(detectedClass)){
-        if(lastUniqueObjects.length>=maxObjects){
+      if (!lastUniqueObjects.contains(detectedClass)) {
+        if (lastUniqueObjects.length >= maxObjects) {
           lastUniqueObjects.remove(0);
         }
         lastUniqueObjects.add(detectedClass);
       }
-
-      print('Últimos objetos detectados: ${lastUniqueObjects.join(", ")}');
 
       describeObject(detectedClass, confidence);
     }
   }
 
   void describeObject(String detectedClass, double confidence) async {
+    if (isVoiceCommandActive) return;
+
     setState(() {
       isSpeaking = true;
     });
 
-    String description = 'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
+    String description =
+        'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
     await flutterTts.speak(description);
 
     flutterTts.setCompletionHandler(() {
@@ -191,42 +194,67 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     }
   }
 
-  // Initialize speech recognizer
   void initSpeechRecognizer() async {
-    bool available = await _speech.initialize(onStatus: (val) {
-      if (val == 'done' && _isListening) {
-        startListening(); // Restart listening after it stops
-      }
-    }, onError: (val) => print('Speech recognizer error: $val'));
-
-    if (available) {
-      startListening();
+    bool available = await _speech.initialize(
+      onStatus: (val) {
+        if (val == 'done' && isListeningManually) {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (val) => print('Error en voz: $val'),
+    );
+    if (!available) {
+      print("Reconocimiento de voz no disponible");
     }
   }
 
-  // Start listening for voice commands
-  void startListening() {
+  void startManualListening() async {
+    isVoiceCommandActive = true;
+    setState(() {
+      isListeningManually = true;
+      _isListening = true;
+    });
+
+    HapticFeedback.mediumImpact();
+    await flutterTts.speak("Estoy escuchando");
+
     _speech.listen(onResult: (val) {
-      if (val.recognizedWords.toLowerCase().contains("cambiar a lectura de texto")) {
+      String command = val.recognizedWords.toLowerCase();
+      if (command.contains("modo lectura")) {
         _navigateToTextReading();
-      } else if (val.recognizedWords.toLowerCase().contains("cambiar a detección de objetos")) {
+      } else if (command.contains("modo normal")) {
         _navigateToObjectDetection();
       }
     });
+  }
+
+  void stopManualListening() async {
+    isVoiceCommandActive = false;
+    await flutterTts.speak("Comando recibido");
+    HapticFeedback.selectionClick();
+    await _speech.stop();
     setState(() {
-      _isListening = true;
+      _isListening = false;
+      isListeningManually = false;
     });
   }
 
   void _navigateToTextReading() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TextReaderScreen(cameras: widget.cameras)),
+      MaterialPageRoute(
+        builder: (_) => TextReaderScreen(cameras: widget.cameras),
+      ),
     );
   }
 
   void _navigateToObjectDetection() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => RealTimeObjectDetection(cameras: widget.cameras, model: widget.model)),
+      MaterialPageRoute(
+        builder: (_) => RealTimeObjectDetection(
+          cameras: widget.cameras,
+          model: widget.model,
+        ),
+      ),
     );
   }
 
@@ -235,12 +263,12 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     if (!_controller.value.isInitialized) {
       return Container();
     }
+
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: CameraPreview(_controller),
-          ),
+          Positioned.fill(child: CameraPreview(_controller)),
+
           if (recognitions != null)
             BoundingBoxes(
               recognitions: recognitions!,
@@ -249,6 +277,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
               screenH: MediaQuery.of(context).size.height,
               screenW: MediaQuery.of(context).size.width,
             ),
+
           Positioned(
             top: 30,
             right: 20,
@@ -259,6 +288,33 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
                 size: 30,
               ),
               onPressed: toggleFlash,
+            ),
+          ),
+
+          // Botón Push to Talk
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTapDown: (_) => startManualListening(),
+                onTapUp: (_) => stopManualListening(),
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 60, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange,
+                    borderRadius: BorderRadius.circular(40),
+                  ),
+                  child: Text(
+                    _isListening
+                        ? "Escuchando..."
+                        : "Mantén presionado para hablar",
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -298,10 +354,7 @@ class BoundingBoxes extends StatelessWidget {
           height: h,
           child: Container(
             decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.red,
-                width: 3,
-              ),
+              border: Border.all(color: Colors.red, width: 3),
             ),
             child: Text(
               "${rec["detectedClass"]} ${(rec["confidenceInClass"] * 100).toStringAsFixed(0)}%",

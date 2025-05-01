@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/services.dart';
+import 'main.dart'; // para volver al modo normal
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class TextReaderScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -18,11 +21,16 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
   FlutterTts flutterTts = FlutterTts();
   bool isProcessing = false;
 
+  stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  bool isListeningManually = false;
+
   @override
   void initState() {
     super.initState();
     initializeCamera();
     configureTts();
+    initSpeechRecognizer();
   }
 
   void configureTts() async {
@@ -51,12 +59,68 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
     final inputImage = InputImage.fromFilePath(image.path);
     final recognizedText = await textRecognizer.processImage(inputImage);
 
-    for (TextBlock block in recognizedText.blocks) {
-      await flutterTts.speak(block.text);
-      break; // Reads only the first detected block
+    // ✅ Concatenar todo el texto detectado
+    String fullText = recognizedText.text.trim();
+
+    if (fullText.isNotEmpty) {
+      await flutterTts.speak(fullText);
+    } else {
+      await flutterTts.speak("No se detectó texto");
     }
 
     setState(() => isProcessing = false);
+  }
+
+  void initSpeechRecognizer() async {
+    bool available = await _speech.initialize(
+      onStatus: (val) {
+        if (val == 'done' && isListeningManually) {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (val) => print('Error en voz: $val'),
+    );
+    if (!available) {
+      print("Reconocimiento de voz no disponible");
+    }
+  }
+
+  void startManualListening() async {
+    setState(() {
+      isListeningManually = true;
+      _isListening = true;
+    });
+
+    HapticFeedback.mediumImpact();
+    await flutterTts.speak("Estoy escuchando");
+
+    _speech.listen(onResult: (val) {
+      String command = val.recognizedWords.toLowerCase();
+      if (command.contains("modo normal") || command.contains("detección de objetos")) {
+        _navigateToObjectDetection();
+      }
+    });
+  }
+
+  void stopManualListening() async {
+    await flutterTts.speak("Comando recibido");
+    HapticFeedback.selectionClick();
+    await _speech.stop();
+    setState(() {
+      _isListening = false;
+      isListeningManually = false;
+    });
+  }
+
+  void _navigateToObjectDetection() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RealTimeObjectDetection(
+          cameras: widget.cameras,
+          model: 'SSDMobileNet',
+        ),
+      ),
+    );
   }
 
   @override
@@ -64,6 +128,7 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
     _controller.dispose();
     textRecognizer.close();
     flutterTts.stop();
+    _speech.stop();
     super.dispose();
   }
 
@@ -72,23 +137,48 @@ class _TextReaderScreenState extends State<TextReaderScreen> {
     if (!_controller.value.isInitialized) {
       return Container();
     }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Lectura de Texto'),
+        backgroundColor: Colors.black87,
       ),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: CameraPreview(_controller),
-          ),
+          Positioned.fill(child: CameraPreview(_controller)),
+
           Positioned(
-            bottom: 30,
+            bottom: 120,
             left: 0,
             right: 0,
             child: Center(
               child: ElevatedButton(
                 onPressed: captureAndReadText,
                 child: Text('Capturar y Leer Texto'),
+              ),
+            ),
+          ),
+
+          // Botón Push to Talk
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTapDown: (_) => startManualListening(),
+                onTapUp: (_) => stopManualListening(),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 60, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange,
+                    borderRadius: BorderRadius.circular(40),
+                  ),
+                  child: Text(
+                    _isListening ? "Escuchando..." : "Mantén presionado para hablar",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ),
               ),
             ),
           ),
