@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.upc.projectnawi"
+    namespace = "com.example.projectnawi"
     compileSdk = 35
     ndkVersion = "25.1.8937393"
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.upc.projectnawi"
+        applicationId = "com.example.projectnawi"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
