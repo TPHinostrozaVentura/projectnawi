@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:projectnawi/banknote_recogni_screen.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter/services.dart';
@@ -290,6 +291,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
         _navigateToTextReading();
       } else if (command.contains("modo normal")) {
         _navigateToObjectDetection();
+      }else if (command.contains("modo billetes")) {
+        _navigateToBanknoteDetection();
       }
     });
   }
@@ -320,6 +323,13 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
           cameras: widget.cameras,
           model: widget.model,
         ),
+      ),
+    );
+  }
+  void _navigateToBanknoteDetection() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CameraInferenceScreen(),
       ),
     );
   }
