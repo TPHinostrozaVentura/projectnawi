@@ -1,11 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:projectnawi/banknote_recogni_screen.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter/services.dart';
 import 'splash_screen.dart';
 import 'package:tflite_v2/tflite_v2.dart';
 import 'text_reader_screen.dart';
+import 'package:http/http.dart' as http;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +45,7 @@ class RealTimeObjectDetection extends StatefulWidget {
 class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
   List<String> lastUniqueObjects = [];
   final int maxObjects = 10;
+  final apiKey='Put your apiKey here';
 
   late CameraController _controller;
   bool isModelLoaded = false;
@@ -63,6 +69,64 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     loadModel(widget.model);
     configureTts();
     initSpeechRecognizer();
+    //initSpeechRecognizer(); // Initialize speech recognition
+  }
+
+  void sendObjectList() async {
+
+    setState(() {
+      isSpeaking = true; // Detiene describeObject
+    });
+
+    String objectList = lastUniqueObjects.join(", ");
+    String message = "Estos son los objetos detectados: $objectList. ahora infiere en que entonrno se encuentra la persona, empieza con una frase como: 'probablemente te encuentras en....' dame una respuesta corta sin detallar cada elemento.";
+
+    final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: json.encode({
+          'model': 'gpt-4o-mini',
+          'messages': [
+            {
+              'role': 'user',
+              'content': message
+            }
+          ]
+        })
+    );
+
+    if(response.statusCode == 200) {
+      final jsonResponse = json.decode(utf8.decode(response.bodyBytes));
+      String analysisResponse = jsonResponse['choices'][0]['message']['content'];
+
+      print("Lista de objetos enviada: $objectList");
+      print("Análisis de GPT: $analysisResponse");
+
+      flutterTts.speak(analysisResponse);
+
+      flutterTts.setCompletionHandler(() {
+        setState(() {
+          isSpeaking = false; // Permite que describeObject continúe
+        });
+      });
+
+    } else {
+      print("Error en la solicitud: ${response.statusCode}");
+      print("Detalles del error: ${response.body}");
+
+      setState(() {
+        isSpeaking = true; // Detiene describeObject
+      });
+    }
+  }
+
+
+
+  String getObjectsString() {
+    return lastUniqueObjects.join(', ');
   }
 
   void configureTts() async {
@@ -157,6 +221,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
         lastUniqueObjects.add(detectedClass);
       }
 
+      print('Últimos objetos detectados: ${lastUniqueObjects.join(", ")}');
+
       describeObject(detectedClass, confidence);
     }
   }
@@ -194,6 +260,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     }
   }
 
+  // Initialize speech recognizer
   void initSpeechRecognizer() async {
     bool available = await _speech.initialize(
       onStatus: (val) {
@@ -224,6 +291,8 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
         _navigateToTextReading();
       } else if (command.contains("modo normal")) {
         _navigateToObjectDetection();
+      }else if (command.contains("modo billetes")) {
+        _navigateToBanknoteDetection();
       }
     });
   }
@@ -257,9 +326,20 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
       ),
     );
   }
+  void _navigateToBanknoteDetection() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CameraInferenceScreen(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+
+    WakelockPlus.enable();
+
+
     if (!_controller.value.isInitialized) {
       return Container();
     }
@@ -279,16 +359,24 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
             ),
 
           Positioned(
-            top: 30,
-            right: 20,
-            child: IconButton(
-              icon: Icon(
-                isFlashOn ? Icons.flash_on : Icons.flash_off,
-                color: Colors.white,
-                size: 30,
-              ),
-              onPressed: toggleFlash,
-            ),
+              top: 30,
+              right: 20,
+              child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        isFlashOn ? Icons.flash_on : Icons.flash_off,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                      onPressed: toggleFlash,
+                    ),
+
+                    IconButton(icon:Icon(Icons.send,color: Colors.white,size: 30,),
+                      onPressed: sendObjectList,
+                    )
+                  ]
+              )
           ),
 
           // Botón Push to Talk
