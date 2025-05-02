@@ -36,11 +36,11 @@ android {
     }
 
     // ⚠️ Aquí se aplica la exclusión de litert //APLICAR SOLO PARA PC FARID
-    configurations.all {
-        exclude group: 'com.google.ai.edge.litert', module: 'litert'
-        exclude group: 'com.google.ai.edge.litert', module: 'litert-api'
-        exclude group: 'com.google.ai.edge.litert', module: 'litert-gpu'
-    }
+//    configurations.all {
+//        exclude group: 'com.google.ai.edge.litert', module: 'litert'
+//        exclude group: 'com.google.ai.edge.litert', module: 'litert-api'
+//        exclude group: 'com.google.ai.edge.litert', module: 'litert-gpu'
+//    }
 }
 
 flutter {
