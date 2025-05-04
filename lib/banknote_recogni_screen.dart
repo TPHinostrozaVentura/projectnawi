@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo/yolo_view.dart';
 import 'package:ultralytics_yolo/yolo.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class CameraInferenceScreen extends StatefulWidget {
   const CameraInferenceScreen({super.key});
@@ -15,6 +16,13 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   double _confidenceThreshold = 0.8;
   double _iouThreshold = 0.50;
   String _lastDetection = "";
+  FlutterTts flutterTts = FlutterTts();
+  bool isVoiceCommandActive = false;
+  bool isSpeaking = false;
+  String _lastSpokenDetection = "";
+  //Set<String> _spokenDetections = {};
+  Map<String, int> _spokenDetections = {};
+  int tamanio = 0;
 
   // Method 1: Create a controller to interact with the YoloView
   final _yoloController = YoloViewController();
@@ -27,10 +35,59 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   // This is just for demonstration - normally you'd pick one approach
   bool _useController = true;
 
-  void _onDetectionResults(List<YOLOResult> results) {
+
+  // Future<void> describeObject(String detectedClass, double confidence) async {
+  //   String description =
+  //       'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
+  //
+  //   debugPrint("Speaking: $description");
+  //
+  //   await flutterTts.stop(); // Para asegurar que interrumpimos cualquier otra cosa
+  //   await flutterTts.speak(description);
+  // }
+
+  Future<void> describeObject() async {
+    if (_spokenDetections.isEmpty) return;
+
+    String description = 'Detectados: ';
+    // description += _spokenDetections.map((detectionKey) {
+    //   String className = detectionKey.replaceAll('_', ' ');
+    //   return className;
+    // }).join('   ');
+    // description += _spokenDetections.map((detectionKey) {
+    //   // detectionKey es algo como "billete-80"
+    //   // Separar la clase y la confianza si quieres hacerlo más detallado
+    //   List<String> parts = detectionKey.split('-');
+    //   //String className = parts[0];
+    //   String className = parts[0].replaceAll('_', ' ');
+    //   String confidence = parts.length > 1 ? parts[1] : '';
+    //   return '$className con $confidence% de confianza';
+    // }).join(', ');
+
+
+    description += _spokenDetections.entries.map((entry) {
+      String className = entry.key.replaceAll('_', ' ');
+      int count = entry.value;
+      if (count == 1) {
+        return 'un billete de $className';
+      } else {
+        return '$count billetes de $className';
+      }
+    }).join(', ');
+
+    debugPrint("Speaking: $description");
+
+    await flutterTts.stop();
+    await flutterTts.speak(description);
+    description='';
+  }
+
+  //void _onDetectionResults(List<YOLOResult> results) {
+  Future<void> _onDetectionResults(List<YOLOResult> results) async {
     if (!mounted) return;
 
     debugPrint('_onDetectionResults called with ${results.length} results');
+    debugPrint('datitos ${results.iterator} results');
 
     // Print details of the first few detections for debugging
     for (var i = 0; i < results.length && i < 3; i++) {
@@ -47,13 +104,85 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
         a.confidence > b.confidence ? a : b);
         _lastDetection = "${topDetection.className} (${(topDetection.confidence * 100).toStringAsFixed(1)}%)";
 
+        //describeObject(topDetection.className, topDetection.confidence);
+
         debugPrint('Updated state: count=$_detectionCount, top=$_lastDetection');
       } else {
         _lastDetection = "None";
         debugPrint('Updated state: No detections');
       }
       _yoloController.setConfidenceThreshold(0.8);
+
+      if (_detectionCount==0) {
+        _spokenDetections.clear();
+      }
+
     });
+
+    // Procesar cada detección individualmente
+    // for (var detection in results) {
+    //   //String descriptionKey = "${detection.className}";
+    //   String className = detection.className;
+    //
+    //   if (_spokenDetections.containsKey(className)) {
+    //     _spokenDetections[className] = _spokenDetections[className]! + 1;
+    //   } else {
+    //     _spokenDetections[className] = 1;
+    //   }
+    //
+    //   // Si este objeto ya fue mencionado, lo saltamos
+    //   // if (_spokenDetections.contains(descriptionKey)) {
+    //   //   debugPrint("Skipping already spoken: $descriptionKey");
+    //   //   continue;
+    //   // }
+    //
+    //   // Lo añadimos al set para no repetir en el futuro
+    //   //_spokenDetections.add(descriptionKey);
+    //
+    //   // Mencionamos este objeto
+    //   await describeObject();
+    //
+    // }
+
+    // Contar los billetes detectados
+    if(tamanio==0){
+      _spokenDetections.clear();
+      for (var detection in results) {
+        String className = detection.className;
+        if (_spokenDetections.containsKey(className)) {
+          _spokenDetections[className] = _spokenDetections[className]! + 1;
+        } else {
+          _spokenDetections[className] = 1;
+        }
+      }
+      await describeObject();
+      tamanio=results.length;
+    }
+
+    if(tamanio!=results.length){
+      _spokenDetections.clear();
+      for (var detection in results) {
+        String className = detection.className;
+        if (_spokenDetections.containsKey(className)) {
+          _spokenDetections[className] = _spokenDetections[className]! + 1;
+        } else {
+          _spokenDetections[className] = 1;
+        }
+      }
+      await describeObject();
+      tamanio=results.length;
+    }
+    if(results.length==0){
+      await flutterTts.stop();
+    }
+
+  }
+
+  @override
+  void dispose() {
+    flutterTts.stop();                   // ✅ Detener TTS
+    _useController=false;
+    super.dispose();
   }
 
   @override
@@ -134,11 +263,11 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
               child: YoloView(
                 // Use GlobalKey or controller based on flag
                 key: null,//_useController ? null : _yoloViewKey,
-                controller: _yoloController,//_useController ? _yoloController : null,
+                controller: _useController ? _yoloController : null,
                 modelPath: 'bestv8nint8',
                 // bestv8nint8  yolov8n_int8
                 task: YOLOTask.detect,
-                onResult: _onDetectionResults,
+                onResult: _useController ?_onDetectionResults: null,
               ),
             ),
           ),
