@@ -13,14 +13,10 @@ class CameraInferenceScreen extends StatefulWidget {
 
 class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   int _detectionCount = 0;
-  double _confidenceThreshold = 0.8;
-  double _iouThreshold = 0.50;
   String _lastDetection = "";
   FlutterTts flutterTts = FlutterTts();
   bool isVoiceCommandActive = false;
   bool isSpeaking = false;
-  String _lastSpokenDetection = "";
-  //Set<String> _spokenDetections = {};
   Map<String, int> _spokenDetections = {};
   int tamanio = 0;
 
@@ -35,35 +31,10 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   // This is just for demonstration - normally you'd pick one approach
   bool _useController = true;
 
-
-  // Future<void> describeObject(String detectedClass, double confidence) async {
-  //   String description =
-  //       'Detectado: $detectedClass con ${(confidence * 100).toStringAsFixed(0)}% de confianza';
-  //
-  //   debugPrint("Speaking: $description");
-  //
-  //   await flutterTts.stop(); // Para asegurar que interrumpimos cualquier otra cosa
-  //   await flutterTts.speak(description);
-  // }
-
   Future<void> describeObject() async {
     if (_spokenDetections.isEmpty) return;
 
     String description = 'Detectados: ';
-    // description += _spokenDetections.map((detectionKey) {
-    //   String className = detectionKey.replaceAll('_', ' ');
-    //   return className;
-    // }).join('   ');
-    // description += _spokenDetections.map((detectionKey) {
-    //   // detectionKey es algo como "billete-80"
-    //   // Separar la clase y la confianza si quieres hacerlo más detallado
-    //   List<String> parts = detectionKey.split('-');
-    //   //String className = parts[0];
-    //   String className = parts[0].replaceAll('_', ' ');
-    //   String confidence = parts.length > 1 ? parts[1] : '';
-    //   return '$className con $confidence% de confianza';
-    // }).join(', ');
-
 
     description += _spokenDetections.entries.map((entry) {
       String className = entry.key.replaceAll('_', ' ');
@@ -82,7 +53,6 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
     description='';
   }
 
-  //void _onDetectionResults(List<YOLOResult> results) {
   Future<void> _onDetectionResults(List<YOLOResult> results) async {
     if (!mounted) return;
 
@@ -119,30 +89,6 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
 
     });
 
-    // Procesar cada detección individualmente
-    // for (var detection in results) {
-    //   //String descriptionKey = "${detection.className}";
-    //   String className = detection.className;
-    //
-    //   if (_spokenDetections.containsKey(className)) {
-    //     _spokenDetections[className] = _spokenDetections[className]! + 1;
-    //   } else {
-    //     _spokenDetections[className] = 1;
-    //   }
-    //
-    //   // Si este objeto ya fue mencionado, lo saltamos
-    //   // if (_spokenDetections.contains(descriptionKey)) {
-    //   //   debugPrint("Skipping already spoken: $descriptionKey");
-    //   //   continue;
-    //   // }
-    //
-    //   // Lo añadimos al set para no repetir en el futuro
-    //   //_spokenDetections.add(descriptionKey);
-    //
-    //   // Mencionamos este objeto
-    //   await describeObject();
-    //
-    // }
 
     // Contar los billetes detectados
     if(tamanio==0){
