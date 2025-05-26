@@ -32,7 +32,7 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   bool _useController = true;
 
   Future<void> describeObject() async {
-    if (_spokenDetections.isEmpty) return;
+    if (_spokenDetections.isEmpty || isSpeaking) return;
 
     String description = 'Detectados: ';
 
@@ -48,7 +48,7 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
 
     debugPrint("Speaking: $description");
 
-    await flutterTts.stop();
+    //await flutterTts.stop();
     await flutterTts.speak(description);
     description='';
   }
@@ -119,14 +119,14 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
       tamanio=results.length;
     }
     if(results.length==0){
-      await flutterTts.stop();
+      //await flutterTts.stop();
     }
 
   }
 
   @override
   void dispose() {
-    flutterTts.stop();                   // ✅ Detener TTS
+    flutterTts.stop();  // ✅ Detener TTS
     _useController=false;
     super.dispose();
   }
@@ -135,6 +135,25 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
   void initState() {
     super.initState();
     _checkModelExists();
+
+    flutterTts.setStartHandler(() {
+      setState(() {
+        isSpeaking = true;
+      });
+    });
+
+    flutterTts.setCompletionHandler(() {
+      setState(() {
+        isSpeaking = false;
+      });
+    });
+
+    flutterTts.setErrorHandler((msg) {
+      setState(() {
+        isSpeaking = false;
+      });
+      debugPrint("TTS Error: $msg");
+    });
 
     // Set initial thresholds via controller
     // We do this in a post-frame callback to ensure the view is initialized
@@ -159,7 +178,7 @@ class _CameraInferenceScreenState extends State<CameraInferenceScreen> {
     try {
       // Obtener el Map del resultado
       final result = await YOLO.checkModelExists('bestv8nint8');
-//bestv8nint8  yolov8n_int8
+      //bestv8nint8  yolov8n_int8
       // Aquí accedemos al valor de la clave 'exists' para verificar si el modelo está disponible
       bool modelExists = result['exists'] ?? false;
 
