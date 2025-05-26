@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import 'package:projectnawi/banknote_recogni_screen.dart';
+import 'package:projectnawi/object_recognition.dart';
 import 'package:projectnawi/useGuide.dart';
 import 'main.dart';
 import 'text_reader_screen.dart';
@@ -102,6 +103,13 @@ class _SplashScreenState extends State<SplashScreen> {
       ),
     );
   }
+  void _navigateToDetection2() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ObjectRecognitionScreen(),
+      ),
+    );
+  }
 
   void _navigateToTextReader() {
     Navigator.of(context).push(
@@ -114,8 +122,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void _navigateToBilletes() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => CameraInferenceScreen(
-        ),
+        builder: (context) => const CameraInferenceScreen(),
       ),
     );
   }
@@ -168,6 +175,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   child: const Text('Iniciar', style: TextStyle(fontSize: 18)),
                 ),
                 const SizedBox(height: 15),
+                // ElevatedButton(
+                //   style: _style(Colors.deepPurpleAccent),
+                //   onPressed: _navigateToDetection2,
+                //   child: const Text('Iniciar2', style: TextStyle(fontSize: 18)),
+                // ),
+                // const SizedBox(height: 15),
                 ElevatedButton(
                   style: _style(Colors.green),
                   onPressed: _navigateToBilletes,
