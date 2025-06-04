@@ -11,6 +11,7 @@ import 'splash_screen.dart';
 import 'package:tflite_v2/tflite_v2.dart';
 import 'text_reader_screen.dart';
 import 'package:http/http.dart' as http;
+import 'package:projectnawi/useGuide.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,7 @@ class RealTimeObjectDetection extends StatefulWidget {
 class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
   List<String> lastUniqueObjects = [];
   final int maxObjects = 10;
-  final apiKey='Put your apiKey here';
+  final apiKey='put your apikey here';
 
   late CameraController _controller;
   bool isModelLoaded = false;
@@ -70,6 +71,13 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     configureTts();
     initSpeechRecognizer();
     //initSpeechRecognizer(); // Initialize speech recognition
+  }
+
+  @override
+  void dispose() {
+    //_speech.stop();
+    flutterTts.stop();
+    super.dispose();
   }
 
   void sendObjectList() async {
@@ -287,12 +295,14 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
 
     _speech.listen(onResult: (val) {
       String command = val.recognizedWords.toLowerCase();
-      if (command.contains("modo lectura")) {
+      if (command.contains("modo lectura")|| command.contains("detección de texto")) {
         _navigateToTextReading();
-      } else if (command.contains("modo normal")) {
-        _navigateToObjectDetection();
-      }else if (command.contains("modo billetes")) {
+      } else if (command.contains("guía de uso")) {
+        _navigateToGuide();
+      }else if (command.contains("modo billetes")|| command.contains("detección de billetes")) {
         _navigateToBanknoteDetection();
+      }else if (command.contains("reconocer el entorno")|| command.contains("reconocimiento de entorno")) {
+        sendObjectList();
       }
     });
   }
@@ -316,13 +326,10 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
     );
   }
 
-  void _navigateToObjectDetection() {
+  void _navigateToGuide() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RealTimeObjectDetection(
-          cameras: widget.cameras,
-          model: widget.model,
-        ),
+        builder: (_) => UserGuide(),
       ),
     );
   }
@@ -337,7 +344,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
   @override
   Widget build(BuildContext context) {
 
-    WakelockPlus.enable();
+    //WakelockPlus.enable();
 
 
     if (!_controller.value.isInitialized) {

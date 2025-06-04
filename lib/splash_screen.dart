@@ -9,6 +9,7 @@ import 'text_reader_screen.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class SplashScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -60,6 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _startManualListening() async {
+    print("_startManualListening");
     setState(() {
       _isListening = true;
       isListeningManually = true;
@@ -69,15 +71,17 @@ class _SplashScreenState extends State<SplashScreen> {
     await flutterTts.speak("Estoy escuchando");
 
     _speech.listen(onResult: (val) {
+      print("_speech.listen");
       String command = val.recognizedWords.toLowerCase();
 
-      if (command.contains("iniciar")) {
+      if (command.contains("iniciar")|| command.contains("detección de objetos")) {
+        print("hablo : detección de objetos");
         _navigateToDetection();
-      } else if (command.contains("modo lectura")) {
+      }else if (command.contains("modo lectura") || command.contains("detección de texto")) {
         _navigateToTextReader();
-      } else if (command.contains("modo billetes") || command.contains("detección de billetes")) {
+      }else if (command.contains("modo billetes") || command.contains("detección de billetes")) {
         _navigateToBilletes();
-      } else if (command.contains("guía") || command.contains("uso")) {
+      }else if (command.contains("guía de uso")) {
         _navigateToGuide();
       }
     });
@@ -143,6 +147,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+    WakelockPlus.enable();
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
