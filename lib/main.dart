@@ -219,6 +219,7 @@ class _RealTimeObjectDetectionState extends State<RealTimeObjectDetection> {
         recognitions.isNotEmpty &&
         !isSpeaking &&
         !isVoiceCommandActive) {
+      //detectedClass: objeto reconocido que sera mencionado por voz
       String detectedClass = recognitions[0]["detectedClass"];
       double confidence = recognitions[0]["confidenceInClass"];
 

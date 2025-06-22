@@ -1,91 +1,91 @@
 ???
-person
-bicycle
-car
-motorcycle
-airplane
+persona
+bicicleta
+auto
+motocicleta
+avion
 bus
-train
-truck
-boat
-traffic light
-fire hydrant
+tren
+camion
+bote
+semaforo
+hidrante de agua
 ???
-stop sign
-parking meter
-bench
-bird
-cat
-dog
-horse
-sheep
-cow
-elephant
-bear
+senial detenerse
+parquímetro
+banquillo
+ave
+gato
+perro
+caballo
+oveja
+vaca
+elefante
+oso
 zebra
-giraffe
+jirafa
 ???
-backpack
-umbrella
+mochila
+paraguas
 ???
 ???
-handbag
-tie
-suitcase
-frisbee
+bolso de mano
+corbata
+maleta
+plato volador
 skis
 snowboard
-sports ball
-kite
-baseball bat
-baseball glove
-skateboard
-surfboard
-tennis racket
-bottle
+deportes de balon
+cometa
+bate de beisbol
+pelota de beisbol
+patineta
+tabla de surf
+raqueta de tenis
+botella
 ???
-wine glass
-cup
-fork
-knife
-spoon
-bowl
-banana
-apple
-sandwich
-orange
+copa de vino
+taza
+tenedor
+cuchillo
+cuchara
+recipiente
+platano
+manzana
+Hambuerguesa
+naranja
 broccoli
-carrot
+zanahoria
 hot dog
 pizza
-donut
-cake
-chair
-couch
-potted plant
-bed
+dona
+pastel
+silla
+sillon
+planta en maceta
+cama
 ???
-dining table
+mesa del comedor
 ???
 ???
-toilet
+sanitario
 ???
 tv
 laptop
 mouse
-remote
-keyboard
-cell phone
-microwave
-oven
-toaster
-sink
-refrigerator
+control remoto
+teclado
+telefono celular
+horno microonda
+horno
+tostadora
+lavatorio
+refrigerador
 ???
-book
-clock
-vase
-scissors
-teddy bear
-hair drier
-toothbrush
+libro
+reloj
+florero
+tijeras
+oso de peluche
+secador de pelo
+cepillo dental
